@@ -18,8 +18,8 @@ class Event(Base):
         comment="Уникальный идентификатор события"
     )
     place_id = Column(
-        Integer,
-        ForeignKey("places.id"),
+        UUID(as_uuid=True),
+        ForeignKey("places.uuid"),
         nullable=False,
         index=True
     )

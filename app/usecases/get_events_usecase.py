@@ -10,6 +10,5 @@ class GetEventsUsecase:
         self.events = events
 
     async def do(self, paginator: Paginator):
-        params = paginator.model_dump(exclude_none=True)
-
-        return await self.events.get_all(**params)
+        """Получить список событий с пагинацией."""
+        return await self.events.get_all(paginator)
