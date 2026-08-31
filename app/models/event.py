@@ -14,14 +14,14 @@ class Event(Base):
         UUID(as_uuid=True),
         primary_key=True,
         default=uuid.uuid4,
-        unique=True,
         comment="Уникальный идентификатор события"
     )
     place_id = Column(
         UUID(as_uuid=True),
         ForeignKey("places.uuid"),
         nullable=False,
-        index=True
+        index=True,
+        comment="Площадка, где будет проходить событие"
     )
     name = Column(String, nullable=False, comment="Название мероприятия")
     event_time = Column(
