@@ -1,16 +1,15 @@
 import uuid
 from pydantic import BaseModel, Field, model_validator
 from datetime import datetime
-from typing import Optional
 
 
 class Paginator(BaseModel):
     """Параметры пагинации и фильтрации"""
     limit: int = Field(100, ge=1, le=1000, description="Количество записей")
     offset: int = Field(0, ge=0, description="Смещение (пропустить N записей)")
-    status: Optional[str] = Field(None, description="Фильтр по статусу")
-    from_date: Optional[datetime] = Field(None, description="Дата начала (с)")
-    to_date: Optional[datetime] = Field(None, description="Дата начала (по)")
+    status: str | None = Field(None, description="Фильтр по статусу")
+    from_date: datetime | None = Field(None, description="Дата начала (с)")
+    to_date: datetime | None= Field(None, description="Дата начала (по)")
 
     @model_validator(mode='after')
     def validate_dates(self):
@@ -31,7 +30,7 @@ class EventResponse(BaseModel):
     place_id: uuid.UUID
     created_at: datetime
     changed_at: datetime
-    status_changed_at: Optional[datetime]
+    status_changed_at: datetime | None
 
     class Config:
         from_attributes = True
