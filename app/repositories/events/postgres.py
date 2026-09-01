@@ -58,27 +58,6 @@ class PostgresEventRepository(EventRepository):
         await self.session.commit()
         return True
 
-    async def create_place_with_seats(self, place_data: dict) -> Place:
-        """Создает места по паттерну"""
-        place = Place(**place_data)
-        self.session.add(place)
-        await self.session.flush()
-
-        ranges = parser_seats_patern(place.seats_pattern)
-
-        for r in ranges:
-            for number in range(r["start"], r["end"] + 1):
-                seat = Seat(
-                    place_id=place.uuid,
-                    section=r["section"],
-                    seat_number=number,
-                    is_available=True
-                )
-                self.session.add(seat)
-        await self.session.commit()
-        await self.session.refresh(place)
-        return place
-
     async def _parse_seat(self, seat_number: str) -> tuple[str, int] | None:
         """Парсит номер места из строки"""
         match = re.match(r"^([A-Z]+)(\d+)$", seat_number)
@@ -142,17 +121,38 @@ class PostgresEventRepository(EventRepository):
 
         return registration
 
-
-    async def cancel_registration(self, registration_id: str) -> bool:
+    async def cancel_registration(self, ticket_id: str) -> bool:
         """Отмена регистрации на событие"""
         result = await self.session.execute(
-            select(Registration).where(Registration.id == registration_id)
+            select(Registration).where(Registration.ticket_id == ticket_id)
         )
         registration = result.scalar_one_or_none()
 
         if not registration:
             return False
 
+        seat_obj = await self.session.execute(
+            select(Seat).where(Seat.id == registration.seat_id)
+        )
+
+        if seat_obj:
+            seat_obj.is_available = True
+
         await self.session.delete(registration)
         await self.session.commit()
+
         return True
+
+    async def get_available_seat(self, event_id) -> dict:
+        """Получение свободных мест на событие"""
+        query = select(Seat).join(
+            Place, Place.uuid == Seat.place_id
+        ).join(
+            Event, Event.place_id == Place.uuid
+        ).where(
+            Event.uuid == event_id,
+            Seat.is_available == True
+        )
+
+        result = await self.session.execute(query)
+        return result.scalars().all()

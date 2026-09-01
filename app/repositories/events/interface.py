@@ -2,7 +2,6 @@ import typing
 
 from app.models import Event, Registration, Place, Seat
 from app.shemas.events import Paginator
-from app.shemas.registration import RegistrationRequest
 
 
 class EventRepository(typing.Protocol):
@@ -34,12 +33,8 @@ class EventRepository(typing.Protocol):
         """Регистрация на событие"""
         raise NotImplementedError()
 
-    async def cancel_registration(self, registration_id: str) -> bool:
+    async def cancel_registration(self, ticket_id: str) -> bool:
         """Отмена регистрации на событие"""
-        raise NotImplementedError()
-
-    async def create_place_with_seats(self, place_data: dict) -> Place:
-        """Создает места по паттерну"""
         raise NotImplementedError()
 
     async def get_seat_by_number(
@@ -47,3 +42,6 @@ class EventRepository(typing.Protocol):
     ) -> Seat | None:
         """Получаем номер места"""
         raise NotImplementedError()
+
+    async def get_available_seat(self, event_id) -> dict:
+        """Получение свободных мест на событие"""
