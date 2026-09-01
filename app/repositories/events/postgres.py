@@ -1,4 +1,5 @@
 import re
+import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
@@ -57,25 +58,6 @@ class PostgresEventRepository(EventRepository):
         await self.session.commit()
         return True
 
-    async def register(
-            self, user_name: str, seat: str, event_id: str
-    ) -> Registration: #TODO
-        """Регистрация на событие"""
-
-    async def cancel_registration(self, registration_id: str) -> bool:
-        """Отмена регистрации на событие"""
-        result = await self.session.execute(
-            select(Registration).where(Registration.id == registration_id)
-        )
-        registration = result.scalar_one_or_none()
-
-        if not registration:
-            return False
-
-        await self.session.delete(registration)
-        await self.session.commit()
-        return True
-
     async def create_place_with_seats(self, place_data: dict) -> Place:
         """Создает места по паттерну"""
         place = Place(**place_data)
@@ -127,3 +109,50 @@ class PostgresEventRepository(EventRepository):
 
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
+
+    async def register(
+            self,
+            event_id: str,
+            first_name: str,
+            last_name: str,
+            seat: str,
+            email: str
+    ) -> Registration:
+        """Регистрация на событие"""
+        seat_obj = await self.get_seat_by_number(event_id, seat)
+
+        if not seat_obj:
+            raise ValueError(f"Место {seat} не найдено")
+
+        if seat_obj.is_available == False:
+            raise ValueError(f"Место {seat} уже занято")
+
+        registration = Registration(
+            first_name=first_name,
+            last_name=last_name,
+            seat=seat,
+            email=email,
+            event_id=event_id
+        )
+
+        self.session.add(registration)
+        seat_obj.is_available = False
+        await self.session.commit()
+        await self.session.refresh(registration)
+
+        return registration
+
+
+    async def cancel_registration(self, registration_id: str) -> bool:
+        """Отмена регистрации на событие"""
+        result = await self.session.execute(
+            select(Registration).where(Registration.id == registration_id)
+        )
+        registration = result.scalar_one_or_none()
+
+        if not registration:
+            return False
+
+        await self.session.delete(registration)
+        await self.session.commit()
+        return True

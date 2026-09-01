@@ -2,6 +2,7 @@ import typing
 
 from app.models import Event, Registration, Place, Seat
 from app.shemas.events import Paginator
+from app.shemas.registration import RegistrationRequest
 
 
 class EventRepository(typing.Protocol):
@@ -23,7 +24,12 @@ class EventRepository(typing.Protocol):
         raise NotImplementedError()
 
     async def register(
-            self, user_name: str, seat: str, event_id: str
+            self,
+            event_id: str,
+            first_name: str,
+            last_name: str,
+            seat: str,
+            email: str
     ) -> Registration:
         """Регистрация на событие"""
         raise NotImplementedError()
