@@ -1,8 +1,11 @@
+import re
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
-from app.models import Event
+from app.models import Event, Registration, Place, Seat
 from app.repositories.events.interface import EventRepository
 from app.shemas.events import Paginator
+from app.utils.seat_parser import parser_seats_patern
 
 
 class PostgresEventRepository(EventRepository):
@@ -54,3 +57,73 @@ class PostgresEventRepository(EventRepository):
         await self.session.commit()
         return True
 
+    async def register(
+            self, user_name: str, seat: str, event_id: str
+    ) -> Registration: #TODO
+        """Регистрация на событие"""
+
+    async def cancel_registration(self, registration_id: str) -> bool:
+        """Отмена регистрации на событие"""
+        result = await self.session.execute(
+            select(Registration).where(Registration.id == registration_id)
+        )
+        registration = result.scalar_one_or_none()
+
+        if not registration:
+            return False
+
+        await self.session.delete(registration)
+        await self.session.commit()
+        return True
+
+    async def create_place_with_seats(self, place_data: dict) -> Place:
+        """Создает места по паттерну"""
+        place = Place(**place_data)
+        self.session.add(place)
+        await self.session.flush()
+
+        ranges = parser_seats_patern(place.seats_pattern)
+
+        for r in ranges:
+            for number in range(r["start"], r["end"] + 1):
+                seat = Seat(
+                    place_id=place.uuid,
+                    section=r["section"],
+                    seat_number=number,
+                    is_available=True
+                )
+                self.session.add(seat)
+        await self.session.commit()
+        await self.session.refresh(place)
+        return place
+
+    async def _parse_seat(self, seat_number: str) -> tuple[str, int] | None:
+        """Парсит номер места из строки"""
+        match = re.match(r"^([A-Z]+)(\d+)$", seat_number)
+        if not match:
+            return None
+
+        return match.group(1), int(match.group(2))
+
+    async def get_seat_by_number(
+            self, event_id: str, seat_number: str
+    ) -> Seat | None:
+        """Находит место (Seat) по номеру места и идентификатору события"""
+        parsed = await self._parse_seat(seat_number)
+        if not parsed:
+            return None
+
+        section, number = parsed
+
+        query = select(Seat).join(
+            Place, Place.uuid == Seat.place_id
+        ).join(
+            Event, Event.place_id == Place.uuid
+        ).where(
+            Event.uuid == event_id,
+            Seat.section == section,
+            Seat.seat_number == number
+        )
+
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
