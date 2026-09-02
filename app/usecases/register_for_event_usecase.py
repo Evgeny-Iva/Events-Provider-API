@@ -1,6 +1,6 @@
 from app.repositories.events.interface import EventRepository
 from app.shemas.registration import RegistrationRequest
-from app.models import Registration
+from app.models import Registration, Event
 
 
 class RegisterForEventUsecase:
@@ -20,3 +20,7 @@ class RegisterForEventUsecase:
         )
 
         return registration
+
+    async def get_event(self, event_id: str) -> Event | None:
+        """Получить событие по ID"""
+        return await self.repo.get(event_id)
