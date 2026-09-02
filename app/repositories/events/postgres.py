@@ -7,6 +7,7 @@ from app.models import Event, Registration, Place, Seat
 from app.repositories.events.interface import EventRepository
 from app.shemas.events import Paginator
 from app.utils.seat_parser import parser_seats_patern
+from app.core.exceptions import SeatNotFoundError, SeatNotAvailableError
 
 
 class PostgresEventRepository(EventRepository):
@@ -101,10 +102,10 @@ class PostgresEventRepository(EventRepository):
         seat_obj = await self.get_seat_by_number(event_id, seat)
 
         if not seat_obj:
-            raise ValueError(f"Место {seat} не найдено")
+            raise SeatNotFoundError(f"Место {seat} не найдено")
 
         if seat_obj.is_available == False:
-            raise ValueError(f"Место {seat} уже занято")
+            raise SeatNotAvailableError(f"Место {seat} уже занято")
 
         registration = Registration(
             first_name=first_name,

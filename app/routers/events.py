@@ -3,12 +3,17 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
+from app.core.exceptions import (
+    SeatNotFoundError,
+    SeatNotAvailableError,
+    EventNotFoundError,
+    EventNotPublishedError
+)
 from app.dependencies.auth import verify_api_key
 from app.usecases import *
 from app.database import get_session
 from app.repositories.events.postgres import PostgresEventRepository
 from app.shemas.registration import RegistrationRequest, RegistrationResponse
-from app.usecases.get_events_usecase import GetEventsUsecase
 from app.shemas.events import EventListResponse, Paginator
 
 
@@ -91,23 +96,34 @@ async def register_for_event(
 ):
     """Зарегистрировать пользователя на событие."""
     try:
-        event = await usecase.get_event(event_id)
-        if not event:
-            raise HTTPException(
-                status_code=404,
-                detail="Event not found"
-            )
-
-        if event.status != "published":
-            raise HTTPException(
-                status_code=400,
-                detail="Event is not published for registration"
-            )
-
         registration = await usecase.do(event_id, data)
 
         return RegistrationResponse(
             ticket_id=registration.ticket_id,
+        )
+
+    except SeatNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail="Event not found"
+        )
+
+    except SeatNotAvailableError:
+        raise HTTPException(
+            status_code=400,
+            detail="This ticket is not available (already sold)."
+        )
+
+    except EventNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail="Event not found"
+        )
+
+    except EventNotPublishedError:
+        raise HTTPException(
+            status_code=400,
+            detail="Event is not published for registration"
         )
 
     except HTTPException:
@@ -128,6 +144,7 @@ def get_cancel_registration_usecase(
 
 @router.post("/{event_id}/unregister")
 async def unregister_from_event(
+        event_id: str,
         ticket_id: str,
         api_key: str = Depends(verify_api_key),
         usecase: CancelRegistrationUsecase = Depends(

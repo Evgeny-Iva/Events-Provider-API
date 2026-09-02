@@ -1,3 +1,4 @@
+from app.core.exceptions import EventNotFoundError, EventNotPublishedError
 from app.repositories.events.interface import EventRepository
 from app.shemas.registration import RegistrationRequest
 from app.models import Registration, Event
@@ -11,6 +12,13 @@ class RegisterForEventUsecase:
 
     async def do(self, event_id: str, data: RegistrationRequest) -> Registration:
         """Зарегистрировать пользователя на событие"""
+        event = await self.repo.get(event_id)
+        if not event:
+            raise EventNotFoundError()
+
+        if event.status != "published":
+            raise EventNotPublishedError()
+
         registration = await self.repo.register(
             first_name=data.first_name,
             last_name=data.last_name,
