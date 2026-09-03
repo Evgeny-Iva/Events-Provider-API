@@ -153,7 +153,7 @@ async def unregister_from_event(
 ):
     """Отменить регистрацию на событие."""
     try:
-        await usecase.do(ticket_id)
+        await usecase.do(event_id, ticket_id)
         return {"message": "Регистрация отменена", "ticket_id": ticket_id}
 
     except ValueError as e:

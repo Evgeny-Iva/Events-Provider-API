@@ -19,6 +19,12 @@ class PostgresEventRepository(EventRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
 
+    async def get(self, event_id: str) -> Event | None:
+        """Получить событие по UUID."""
+        result = await self.session.execute(
+            select(Event).where(Event.uuid == event_id)
+        )
+        return result.scalar_one_or_none()
 
     async def get_all(self, paginator: Paginator) -> list[Event]:
         """Получение списка событий"""
@@ -99,50 +105,68 @@ class PostgresEventRepository(EventRepository):
             email: str
     ) -> Registration:
         """Регистрация на событие"""
-        seat_obj = await self.get_seat_by_number(event_id, seat)
+        try:
+            seat_obj = await self.get_seat_by_number(event_id, seat)
 
-        if not seat_obj:
-            raise SeatNotFoundError(f"Место {seat} не найдено")
+            if not seat_obj:
+                raise SeatNotFoundError(f"Место {seat} не найдено")
 
-        if seat_obj.is_available == False:
-            raise SeatNotAvailableError(f"Место {seat} уже занято")
+            if seat_obj.is_available == False:
+                raise SeatNotAvailableError(f"Место {seat} уже занято")
 
-        registration = Registration(
-            first_name=first_name,
-            last_name=last_name,
-            seat=seat,
-            email=email,
-            event_id=event_id
-        )
+            registration = Registration(
+                first_name=first_name,
+                last_name=last_name,
+                seat_id=seat_obj.id,
+                email=email,
+                event_id=event_id
+            )
 
-        self.session.add(registration)
-        seat_obj.is_available = False
-        await self.session.commit()
-        await self.session.refresh(registration)
+            self.session.add(registration)
+            seat_obj.is_available = False
+            await self.session.commit()
+            await self.session.refresh(registration)
 
-        return registration
+            return registration
 
-    async def cancel_registration(self, ticket_id: str) -> bool:
-        """Отмена регистрации на событие"""
+        except Exception:
+            await self.session.rollback()
+            raise
+
+    async def get_registration_by_ticket(self, ticket_id: str) -> Registration | None:
+        """Найти регистрацию по ticket_id"""
         result = await self.session.execute(
             select(Registration).where(Registration.ticket_id == ticket_id)
         )
-        registration = result.scalar_one_or_none()
+        return result.scalar_one_or_none()
 
-        if not registration:
-            return False
+    async def cancel_registration(self, ticket_id: str) -> bool:
+        """Отмена регистрации на событие"""
+        try:
+            result = await self.session.execute(
+                select(Registration).where(Registration.ticket_id == ticket_id)
+            )
+            registration = result.scalar_one_or_none()
 
-        seat_obj = await self.session.execute(
-            select(Seat).where(Seat.id == registration.seat_id)
-        )
+            if not registration:
+                return False
 
-        if seat_obj:
-            seat_obj.is_available = True
+            seat_result = await self.session.execute(
+                select(Seat).where(Seat.id == registration.seat_id)
+            )
+            seat = seat_result.scalar_one_or_none()
 
-        await self.session.delete(registration)
-        await self.session.commit()
+            if seat:
+                seat.is_available = True
 
-        return True
+            await self.session.delete(registration)
+            await self.session.commit()
+
+            return True
+
+        except Exception:
+            await self.session.rollback()
+            raise
 
     async def get_available_seat(self, event_id) -> dict:
         """Получение свободных мест на событие"""

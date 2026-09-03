@@ -59,4 +59,5 @@ class Event(Base):
     )
 
     place = relationship("Place", back_populates="events")
+    registrations = relationship("Registration", back_populates="event")
 

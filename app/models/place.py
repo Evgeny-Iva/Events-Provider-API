@@ -36,3 +36,4 @@ class Place(Base):
     )
 
     events = relationship("Event", back_populates="place")
+    seats = relationship("Seat", back_populates="place")

@@ -1,4 +1,4 @@
-from app.models import Seat, Event
+from app.models import Event
 from app.repositories.events.interface import EventRepository
 
 
@@ -7,9 +7,9 @@ class GetAvailableSeatsUsecase:
     def __init__(self, repo: EventRepository):
         self.repo = repo
 
-    async def do(self, event_id: str) -> list[Seat]:
+    async def do(self, event_id: str) -> dict:
         """Получение свободных мест"""
-        seats = await self.repo.get_available_seats(event_id)
+        seats = await self.repo.get_available_seat(event_id)
         return seats
 
     async def get_event(self, event_id: str) -> Event | None:

@@ -1,6 +1,6 @@
 import typing
 
-from app.models import Event, Registration, Place, Seat
+from app.models import Event, Registration, Seat
 from app.shemas.events import Paginator
 
 
@@ -32,6 +32,9 @@ class EventRepository(typing.Protocol):
     ) -> Registration:
         """Регистрация на событие"""
         raise NotImplementedError()
+
+    async def get_registration_by_ticket(self, ticket_id: str) -> Registration | None:
+        """Найти регистрацию по ticket_id"""
 
     async def cancel_registration(self, ticket_id: str) -> bool:
         """Отмена регистрации на событие"""
