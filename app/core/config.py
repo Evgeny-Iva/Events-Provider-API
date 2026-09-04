@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    """Все настройки приложения"""
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str
     POSTGRES_DB: str
@@ -14,8 +15,15 @@ class Settings(BaseSettings):
     DB_PORT: str
     DB_NAME: str
 
-    DATABASE_URL: str
-    SYNC_DATABASE_URL: str
+    @property
+    def DATABASE_URL(self) -> str:
+        """Асинхронный URL для приложения (asyncpg)"""
+        return f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+
+    @property
+    def SYNC_DATABASE_URL(self) -> str:
+        """Синхронный URL для миграций (psycopg2)"""
+        return f"postgresql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
     DB_POOL_SIZE: int = 10
     DB_MAX_OVERFLOW: int = 20
