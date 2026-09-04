@@ -16,7 +16,7 @@ async def test_get_events(client: AsyncClient, api_key: str):
 async def test_get_events_invalid_api_key(client: AsyncClient):
     """Проверка получение списка событий с неверным api key"""
     response = await client.get(
-        "/api/events/?limit=10",
+        "/api/events/?limit=10/",
         headers={"api-key": "wrong-key"}
     )
     assert response.status_code == 401

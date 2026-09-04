@@ -6,10 +6,13 @@ from datetime import datetime
 class Paginator(BaseModel):
     """Параметры пагинации и фильтрации"""
     limit: int = Field(100, ge=1, le=1000, description="Количество записей")
-    offset: int = Field(0, ge=0, description="Смещение (пропустить N записей)")
+    cursor: str | None = Field(
+        None, description="Курсор для пагинации (UUID последнего события)"
+    )
     status: str | None = Field(None, description="Фильтр по статусу")
     from_date: datetime | None = Field(None, description="Дата начала (с)")
     to_date: datetime | None= Field(None, description="Дата начала (по)")
+    changed_at: datetime | None = Field(None, description="Фильтр события")
 
     @model_validator(mode='after')
     def validate_dates(self):

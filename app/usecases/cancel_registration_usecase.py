@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from app.repositories.events.interface import EventRepository
 
 
@@ -16,5 +17,10 @@ class CancelRegistrationUsecase:
 
         if str(result.event_id) != str(event_id):
             raise ValueError("Билет не принадлежит этому событию")
+
+        event = await self.repo.get(event_id)
+
+        if datetime.now(timezone.utc) > event.event_time:
+            raise ValueError("Нельзя отменить регистрацию после события")
 
         return await self.repo.cancel_registration(result.uuid)

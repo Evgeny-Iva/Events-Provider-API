@@ -13,7 +13,7 @@ async def test_register(client: AsyncClient, api_key: str, test_event: str):
         "email": "ivan@example.com"
     }
     response = await client.post(
-        f"/api/events/{event_id}/register",
+        f"/api/events/{event_id}/register/",
         headers={"api-key": api_key},
         json=data
     )
@@ -36,13 +36,13 @@ async def test_register_seat_taken(
     }
 
     await client.post(
-        f"/api/events/{event_id}/register",
+        f"/api/events/{event_id}/register/",
         headers={"api-key": api_key},
         json=data
     )
 
     response = await client.post(
-        f"/api/events/{event_id}/register",
+        f"/api/events/{event_id}/register/",
         headers={"api-key": api_key},
         json=data
     )
@@ -76,7 +76,7 @@ async def test_register_concurrent(
 
     async def register_user(data):
         return await client.post(
-            f"/api/events/{event_id}/register",
+            f"/api/events/{event_id}/register/",
             headers={"api-key": api_key},
             json=data
         )

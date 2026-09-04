@@ -14,7 +14,7 @@ async def test_unregister(client: AsyncClient, api_key: str, test_event: str):
         "email": "ivan@example.com"
     }
     register_response = await client.post(
-        f"/api/events/{event_id}/register",
+        f"/api/events/{event_id}/register/",
         headers={"api-key": api_key},
         json=data
     )
@@ -22,7 +22,7 @@ async def test_unregister(client: AsyncClient, api_key: str, test_event: str):
     ticket_id = register_response.json()["ticket_id"]
 
     response = await client.post(
-        f"/api/events/{event_id}/unregister?ticket_id={ticket_id}",
+        f"/api/events/{event_id}/unregister/?ticket_id={ticket_id}",
         headers={"api-key": api_key}
     )
     assert response.status_code == 200
@@ -39,7 +39,7 @@ async def test_unregister_ticket_not_found(
     event_id = test_event
     response = await client.post(
         (f"/api/events/{event_id}/"
-         f"unregister?ticket_id=12345678-1234-1234-1234-123456789012"),
+         f"unregister/?ticket_id=12345678-1234-1234-1234-123456789012"),
         headers={"api-key": api_key}
     )
     assert response.status_code == 404

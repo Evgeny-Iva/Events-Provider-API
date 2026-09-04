@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
+from urllib.parse import urlencode
 import logging
 
 from app.core.exceptions import (
@@ -41,27 +42,31 @@ async def get_events(
 ):
     """Получить список событий."""
     try:
-        if (
-            paginator.from_date
-            and not isinstance(paginator.from_date, datetime)
-        ):
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "from_date": ["Enter a valid date."]
-                }
-            )
+        events, next_cursor, previous_cursor = await usecase.do(paginator)
 
-        events = await usecase.do(paginator)
+        base_url = "/api/events/"
+        next_url = None
+        previous_url = None
 
-        return EventListResponse(
-            data=events,
-            meta={
+        if next_cursor:
+            params = paginator.model_dump(exclude={"cursor"})
+            params["cursor"] = next_cursor
+            next_url = f"{base_url}?{urlencode(params)}"
+
+        if previous_cursor:
+            params = paginator.model_dump(exclude={"cursor"})
+            params["cursor"] = previous_cursor
+            previous_url = f"{base_url}?{urlencode(params)}"
+
+        return {
+            "data": events,
+            "meta": {
                 "limit": paginator.limit,
-                "offset": paginator.offset,
-                "total": len(events)
+                "next": next_url,
+                "previous": previous_url
             }
-        )
+        }
+
 
     except ValueError as e:
 
@@ -87,7 +92,7 @@ def get_register_usecase(
     return RegisterForEventUsecase(repo)
 
 
-@router.post("/{event_id}/register", response_model=RegistrationResponse)
+@router.post("/{event_id}/register/", response_model=RegistrationResponse)
 async def register_for_event(
         event_id: str,
         data: RegistrationRequest,
@@ -142,7 +147,7 @@ def get_cancel_registration_usecase(
     return CancelRegistrationUsecase(repo)
 
 
-@router.post("/{event_id}/unregister")
+@router.post("/{event_id}/unregister/")
 async def unregister_from_event(
         event_id: str,
         ticket_id: str,
@@ -171,7 +176,7 @@ def get_available_seat_usecase(
     return GetAvailableSeatsUsecase(repo)
 
 
-@router.get("/{event_id}/seats")
+@router.get("/{event_id}/seats/")
 async def get_available_seats(
         event_id: str,
         usecase: GetAvailableSeatsUsecase = Depends(get_available_seat_usecase),

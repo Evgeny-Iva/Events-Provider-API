@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from app.core.exceptions import EventNotFoundError, EventNotPublishedError
 from app.repositories.events.interface import EventRepository
 from app.shemas.registration import RegistrationRequest
@@ -18,6 +19,9 @@ class RegisterForEventUsecase:
 
         if event.status != "published":
             raise EventNotPublishedError()
+
+        if datetime.now(timezone.utc) > event.registration_deadline:
+            raise ValueError("Registration deadline has passed")
 
         registration = await self.repo.register(
             first_name=data.first_name,

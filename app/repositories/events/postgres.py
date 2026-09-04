@@ -26,11 +26,16 @@ class PostgresEventRepository(EventRepository):
         )
         return result.scalar_one_or_none()
 
-    async def get_all(self, paginator: Paginator) -> list[Event]:
+    async def get_all(
+            self, paginator: Paginator
+    ) -> tuple[list[Event], str | None, str | None]:
         """Получение списка событий"""
         query = select(Event)
 
         filters = []
+        if paginator.changed_at:
+            filters.append(Event.changed_at >= paginator.changed_at)
+
         if paginator.status:
             filters.append(Event.status == paginator.status)
 
@@ -40,14 +45,40 @@ class PostgresEventRepository(EventRepository):
         if paginator.to_date:
             filters.append(Event.event_time <= paginator.to_date)
 
+        if paginator.cursor:
+            filters.append(Event.uuid > paginator.cursor)
+
         if filters:
             query = query.where(and_(*filters))
 
-        query = query.order_by(Event.event_time.desc())
-        query = query.limit(paginator.limit).offset(paginator.offset)
+        query = query.order_by(Event.changed_at.asc(), Event.uuid.asc())
+        query = query.limit(paginator.limit + 1)
 
         result = await self.session.execute(query)
-        return result.scalars().all()
+        events = result.scalars().all()
+
+        next_cursor = None
+        previous_cursor = None
+
+        if len(events) > paginator.limit:
+            next_cursor = str(events[-2].uuid)
+            events = events[:-1]
+
+        if paginator.cursor:
+            prev_query = select(Event).where(
+                and_(*filters, Event.uuid < paginator.cursor)
+            )
+            prev_query = prev_query.order_by(Event.uuid.desc()).limit(
+                paginator.limit
+            )
+
+            prev_result = await self.session.execute(prev_query)
+            prev_events = prev_result.scalars().all()
+
+            if prev_events:
+                previous_cursor = str(prev_events[-1].uuid)
+
+        return events, next_cursor, previous_cursor
 
     async def save(self, event: Event) -> Event:
         """Сохранить событие в БД"""
@@ -171,7 +202,7 @@ class PostgresEventRepository(EventRepository):
             await self.session.rollback()
             raise
 
-    async def get_available_seat(self, event_id) -> dict:
+    async def get_available_seat(self, event_id) -> list[Seat]:
         """Получение свободных мест на событие"""
         query = select(Seat).join(
             Place, Place.uuid == Seat.place_id

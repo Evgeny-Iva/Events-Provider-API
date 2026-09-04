@@ -46,5 +46,5 @@ class EventRepository(typing.Protocol):
         """Получаем номер места"""
         raise NotImplementedError()
 
-    async def get_available_seat(self, event_id) -> dict:
+    async def get_available_seat(self, event_id) -> list[Seat]:
         """Получение свободных мест на событие"""
