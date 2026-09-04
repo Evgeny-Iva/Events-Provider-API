@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     EXTERNAL_API_KEY: str = ""
     EXTERNAL_API_TIMEOUT: int = 10
 
+    API_KEY: str = "my-secret-key"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

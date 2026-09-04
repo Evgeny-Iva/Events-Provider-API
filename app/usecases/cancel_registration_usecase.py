@@ -14,7 +14,7 @@ class CancelRegistrationUsecase:
         if not result:
             raise ValueError(f"Регистрация по ticket_id {ticket_id} не найдена")
 
-        if result.event_id != event_id:
+        if str(result.event_id) != str(event_id):
             raise ValueError("Билет не принадлежит этому событию")
 
-        return await self.repo.cancel_registration(result.id)
+        return await self.repo.cancel_registration(result.uuid)

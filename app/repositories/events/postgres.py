@@ -74,7 +74,7 @@ class PostgresEventRepository(EventRepository):
         return match.group(1), int(match.group(2))
 
     async def get_seat_by_number(
-            self, event_id: str, seat_number: str
+            self, event_id: str, seat_number: str, lock: bool = False
     ) -> Seat | None:
         """Находит место (Seat) по номеру места и идентификатору события"""
         parsed = await self._parse_seat(seat_number)
@@ -93,6 +93,9 @@ class PostgresEventRepository(EventRepository):
             Seat.seat_number == number
         )
 
+        if lock:
+            query = query.with_for_update()
+
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
@@ -106,7 +109,7 @@ class PostgresEventRepository(EventRepository):
     ) -> Registration:
         """Регистрация на событие"""
         try:
-            seat_obj = await self.get_seat_by_number(event_id, seat)
+            seat_obj = await self.get_seat_by_number(event_id, seat, lock=True)
 
             if not seat_obj:
                 raise SeatNotFoundError(f"Место {seat} не найдено")
