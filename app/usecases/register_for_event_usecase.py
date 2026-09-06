@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from app.core.exceptions import EventNotFoundError, EventNotPublishedError
 from app.repositories.events.interface import EventRepository
-from app.shemas.registration import RegistrationRequest
+from app.schemas.registration import RegistrationRequest
 from app.models import Registration, Event
 
 

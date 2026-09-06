@@ -4,6 +4,8 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker
 )
 from sqlalchemy.orm import declarative_base
+from contextlib import asynccontextmanager
+from typing import AsyncIterable
 
 from app.core.config import settings
 
@@ -25,13 +27,18 @@ AsyncSessionLocal = async_sessionmaker(
 )
 
 
-async def get_session() -> AsyncSession:
+@asynccontextmanager
+async def get_session() -> AsyncIterable[AsyncSession]:
     """Получить сессию базы данных."""
     async with AsyncSessionLocal() as session:
         try:
             yield session
+        except Exception:
+            await session.rollback()
+            raise
         finally:
             await session.close()
+
 
 async def create_tables():
     """Создать все таблицы в БД."""

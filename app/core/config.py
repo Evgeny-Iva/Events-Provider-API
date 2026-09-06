@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     REDIS_PASSWORD: str = ""
 
     DB_ECHO: bool = True
-    EXTERNAL_API_URL: str = "https://api.events.com"
+    EXTERNAL_API_URL: str = "https://events-provider.dev-2.python-labs.ru"
     EXTERNAL_API_KEY: str = ""
     EXTERNAL_API_TIMEOUT: int = 10
 

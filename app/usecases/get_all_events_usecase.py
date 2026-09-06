@@ -1,8 +1,8 @@
 from app.repositories.events.interface import EventRepository
-from app.shemas.events import Paginator
+from app.schemas.events import Paginator
 
 
-class GetEventsUsecase:
+class GetAllEventsUsecase:
     """UseCase для получения списка событий"""
 
     def __init__(self, events: EventRepository):

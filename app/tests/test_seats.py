@@ -1,6 +1,7 @@
 import pytest
 from httpx import AsyncClient
 
+
 @pytest.mark.asyncio
 async def test_get_seats(client: AsyncClient, api_key: str, test_event: str):
     """Проверка получение списка свободных мест"""
@@ -14,6 +15,7 @@ async def test_get_seats(client: AsyncClient, api_key: str, test_event: str):
     assert "event_id" in data
     assert "available_seats" in data
     assert data["count"] == 10
+
 
 @pytest.mark.asyncio
 async def test_get_seats_event_not_found(client: AsyncClient, api_key: str):

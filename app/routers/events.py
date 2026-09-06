@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException
-from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from urllib.parse import urlencode
 import logging
@@ -11,11 +10,17 @@ from app.core.exceptions import (
     EventNotPublishedError
 )
 from app.dependencies.auth import verify_api_key
+from app.services.sync_service import SyncService
 from app.usecases import *
 from app.database import get_session
 from app.repositories.events.postgres import PostgresEventRepository
-from app.shemas.registration import RegistrationRequest, RegistrationResponse
-from app.shemas.events import EventListResponse, Paginator
+from app.schemas.registration import RegistrationRequest, RegistrationResponse
+from app.schemas.events import (
+    EventListResponse,
+    Paginator,
+    PlaceInfo,
+    EventDetailResponse
+)
 
 
 logger = logging.getLogger(__name__)
@@ -31,13 +36,13 @@ def get_events_usecase(
         repo: PostgresEventRepository = Depends(get_postgres_repository)
 ):
     """Создает UseCase с обоими репозиториями"""
-    return GetEventsUsecase(repo)
+    return GetAllEventsUsecase(repo)
 
 
 @router.get("/", response_model=EventListResponse)
 async def get_events(
         paginator: Paginator = Depends(),
-        usecase: GetEventsUsecase = Depends(get_events_usecase),
+        usecase: GetAllEventsUsecase = Depends(get_events_usecase),
         api_key: str = Depends(verify_api_key)
 ):
     """Получить список событий."""
@@ -84,6 +89,25 @@ async def get_events(
             status_code=500,
             detail={"detail": "Internal server error"}
         )
+
+
+@router.get("/health")
+async def health_check():
+    return {"status": "ok"}
+
+
+@router.post("/sync/trigger")
+async def trigger_sync():
+    """Ручной запуск синхронизации."""
+    try:
+        async for session in get_session():
+            repo = PostgresEventRepository(session)
+            sync_service = SyncService()
+            await sync_service.sync_events(repo)
+            break
+        return {"status": "sync completed"}
+    except Exception as e:
+        raise HTTPException(500, f"Sync failed: {e}")
 
 
 def get_register_usecase(
@@ -226,3 +250,38 @@ async def get_available_seats(
             status_code=500,
             detail="Internal server error"
         )
+
+
+def get_event_usecase(
+        repo: PostgresEventRepository = Depends(get_postgres_repository)
+) -> GetEventUsecase:
+    return GetEventUsecase(repo)
+
+
+@router.get("/{event_id}", response_model=EventDetailResponse)
+async def get_event(
+        event_id: str,
+        usecase: GetEventUsecase = Depends(get_event_usecase),
+        api_key: str = Depends(verify_api_key)
+):
+    """Получить детали события."""
+    event = await usecase.do(event_id)
+
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    return EventDetailResponse(
+        id=event.uuid,
+        name=event.name,
+        place=PlaceInfo(
+            id=event.place.uuid,
+            name=event.place.name,
+            city=event.place.city,
+            address=event.place.address,
+            seats_pattern=event.place.seats_pattern
+        ),
+        event_time=event.event_time,
+        registration_deadline=event.registration_deadline,
+        status=event.status,
+        number_of_visitors=event.number_of_visitors
+    )

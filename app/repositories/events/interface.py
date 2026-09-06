@@ -1,7 +1,7 @@
 import typing
 
 from app.models import Event, Registration, Seat
-from app.shemas.events import Paginator
+from app.schemas.events import Paginator
 
 
 class EventRepository(typing.Protocol):

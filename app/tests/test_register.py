@@ -20,6 +20,7 @@ async def test_register(client: AsyncClient, api_key: str, test_event: str):
     assert response.status_code == 200
     assert "ticket_id" in response.json()
 
+
 @pytest.mark.asyncio
 async def test_register_seat_taken(
         client: AsyncClient,
