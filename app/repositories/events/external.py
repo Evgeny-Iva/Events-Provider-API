@@ -1,7 +1,7 @@
 from app.models import Event
 from app.repositories.events.interface import EventRepository
 from app.clients.events_provider_client import EventsProviderClient
-from app.shemas.events import Paginator
+from app.schemas.events import Paginator
 
 
 class ExternalEventRepository(EventRepository):

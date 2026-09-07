@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from app.models import Event, Registration, Place, Seat
 from app.repositories.events.interface import EventRepository
-from app.shemas.events import Paginator
+from app.schemas.events import Paginator
 from app.utils.seat_parser import parser_seats_patern
 from app.core.exceptions import SeatNotFoundError, SeatNotAvailableError
 

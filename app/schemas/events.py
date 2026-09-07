@@ -43,3 +43,23 @@ class EventListResponse(BaseModel):
     """Схема для ответа со списком событий"""
     data: list[EventResponse]
     meta: dict
+
+
+class PlaceInfo(BaseModel):
+    """Информация о площадке"""
+    id: uuid.UUID
+    name: str
+    city: str
+    address: str
+    seats_pattern: str
+
+
+class EventDetailResponse(BaseModel):
+    """Детальная информация о событии"""
+    id: uuid.UUID
+    name: str
+    place: PlaceInfo
+    event_time: datetime
+    registration_deadline: datetime
+    status: str
+    number_of_visitors: int
