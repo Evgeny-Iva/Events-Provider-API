@@ -1,13 +1,12 @@
 import re
-import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from app.models import Event, Registration, Place, Seat
 from app.repositories.events.interface import EventRepository
 from app.schemas.events import Paginator
-from app.utils.seat_parser import parser_seats_patern
 from app.core.exceptions import SeatNotFoundError, SeatNotAvailableError
+from sqlalchemy.orm import joinedload
 
 
 class PostgresEventRepository(EventRepository):
@@ -22,7 +21,9 @@ class PostgresEventRepository(EventRepository):
     async def get(self, event_id: str) -> Event | None:
         """Получить событие по UUID."""
         result = await self.session.execute(
-            select(Event).where(Event.uuid == event_id)
+            select(Event)
+            .where(Event.uuid == event_id)
+            .options(joinedload(Event.place))
         )
         return result.scalar_one_or_none()
 

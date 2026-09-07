@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import declarative_base
 from contextlib import asynccontextmanager
-from typing import AsyncIterable
+from typing import AsyncIterable, AsyncGenerator
 
 from app.core.config import settings
 
@@ -26,6 +26,10 @@ AsyncSessionLocal = async_sessionmaker(
     autoflush=False,
 )
 
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """Получить сессию базы данных для Depends."""
+    async with AsyncSessionLocal() as session:
+        yield session
 
 @asynccontextmanager
 async def get_session() -> AsyncIterable[AsyncSession]:

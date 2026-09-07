@@ -1,5 +1,5 @@
 import uuid
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, field_validator
 from datetime import datetime
 
 
@@ -20,6 +20,16 @@ class Paginator(BaseModel):
         if self.from_date and self.to_date and self.from_date > self.to_date:
             raise ValueError("from_date не может быть позже to_date")
         return self
+
+    @field_validator('changed_at', mode='before')
+    def parse_changed_at(cls, v):
+        """Превращает строку 'YYYY-MM-DD' в datetime"""
+        if isinstance(v, str):
+            try:
+                return datetime.strptime(v, "%Y-%m-%d")
+            except ValueError:
+                raise ValueError("changed_at must be in YYYY-MM-DD format")
+        return v
 
 
 class EventResponse(BaseModel):

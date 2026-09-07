@@ -21,13 +21,14 @@ from app.schemas.events import (
     PlaceInfo,
     EventDetailResponse
 )
+from app.database import get_db
 
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/events", tags=["events"])
 
-def get_postgres_repository(session: AsyncSession = Depends(get_session)):
+def get_postgres_repository(session: AsyncSession = Depends(get_db)):
     """Создает репозиторий для работы с PostgreSQL"""
     return PostgresEventRepository(session)
 
@@ -100,11 +101,10 @@ async def health_check():
 async def trigger_sync():
     """Ручной запуск синхронизации."""
     try:
-        async for session in get_session():
+        async with get_session() as session:
             repo = PostgresEventRepository(session)
             sync_service = SyncService()
             await sync_service.sync_events(repo)
-            break
         return {"status": "sync completed"}
     except Exception as e:
         raise HTTPException(500, f"Sync failed: {e}")

@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, Header
+from fastapi import HTTPException, Header
 from app.core.config import settings
 
 async def verify_api_key(api_key: str = Header(...)):
