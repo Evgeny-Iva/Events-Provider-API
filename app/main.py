@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 print(f"Sync error: {e}")
 
-            await asyncio.sleep(300)
+            await asyncio.sleep(24*60*60)
 
     task = asyncio.create_task(periodic_sync())
 

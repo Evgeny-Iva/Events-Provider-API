@@ -3,6 +3,7 @@ from app.repositories.events.interface import EventRepository
 from app.clients.events_provider_client import EventsProviderClient
 from app.schemas.events import Paginator
 from datetime import datetime
+import uuid
 
 
 def parse_date(value):
@@ -16,15 +17,22 @@ def parse_date(value):
     return value
 
 
+def ensure_uuid(value):
+    """Преобразует значение в UUID или строку UUID."""
+    if value is None:
+        return None
+    if isinstance(value, uuid.UUID):
+        return str(value)
+    if isinstance(value, str):
+        return value
+    return str(value)
+
+
 class ExternalEventRepository(EventRepository):
-    """
-    Реализация репозитория для внешнего API.
-    Здесь делаем HTTP-запросы.
-    """
+    """Реализация репозитория для внешнего API."""
 
     def __init__(self, client: EventsProviderClient):
         self.client = client
-
 
     async def get_all(self, paginator: Paginator) -> list[Event]:
         """Получить список событий из внешнего API"""
@@ -32,7 +40,7 @@ class ExternalEventRepository(EventRepository):
 
         if (
                 "changed_at" in params
-                and isinstance(params["changed_at"],datetime)
+                and isinstance(params["changed_at"], datetime)
         ):
             params["changed_at"] = params["changed_at"].strftime("%Y-%m-%d")
 
@@ -40,27 +48,35 @@ class ExternalEventRepository(EventRepository):
 
         events = []
         for raw in raw_events:
-            place_data = raw.get("place", {})
-            place_id = place_data.get("id")
+            place_data = raw.get("place")
+            if not place_data:
+                continue
+
+            place_uuid = ensure_uuid(place_data.get("id"))
+
             place = Place(
-                uuid=place_id,
+                uuid=place_uuid,
                 name=place_data.get("name"),
                 city=place_data.get("city"),
                 address=place_data.get("address"),
                 seats_pattern=place_data.get("seats_pattern"),
             )
 
+            event_uuid = ensure_uuid(raw.get("id"))
+
             event = Event(
-                uuid=raw.get("id"),
+                uuid=event_uuid,
                 name=raw.get("name"),
                 event_time=parse_date(raw.get("event_time")),
-                registration_deadline=parse_date(raw.get("registration_deadline")),
+                registration_deadline=parse_date(
+                    raw.get("registration_deadline")),
                 status=raw.get("status"),
                 number_of_visitors=raw.get("number_of_visitors", 0),
                 changed_at=parse_date(raw.get("changed_at")),
                 created_at=parse_date(raw.get("created_at")),
                 status_changed_at=parse_date(raw.get("status_changed_at")),
                 place=place,
+                place_id=place.uuid,
             )
             events.append(event)
 

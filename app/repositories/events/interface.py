@@ -10,16 +10,14 @@ class EventRepository(typing.Protocol):
         """Получить событие по ID"""
         raise NotImplementedError()
 
-    async def get_all(self, paginator: Paginator)  -> list[Event]:
+    async def get_all(
+            self, paginator: Paginator
+    ) -> tuple[list[Event], str | None, str | None]:
         """Получить список событий с фильтрацией"""
         raise NotImplementedError()
 
     async def save(self, event: Event) -> Event:
         """Сохранить событие (создать или обновить)"""
-        raise NotImplementedError()
-
-    async def delete(self, event_id: str) -> bool:
-        """Удалить событие по ID"""
         raise NotImplementedError()
 
     async def register(

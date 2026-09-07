@@ -19,7 +19,30 @@ class PostgresEventRepository(EventRepository):
         self.session = session
 
     async def get(self, event_id: str) -> Event | None:
-        """Получить событие по UUID."""
+        """
+        Возвращает полную информацию о событии, включая данные о площадке.
+
+        Пример запроса:
+        GET /api/event/event_id
+
+        Пример ответа:
+        {
+            "id": "123e4567-e89b-12d3-a456-426614174000",
+            "name": "Концерт",
+            "place":
+            {
+                "id": "123e4567-e89b-12d3-a456-426614174000",
+                "name": "Крокус Сити Холл",
+                "city": "Москва",
+                "address": "ул. Международная, 20",
+                "seats_pattern": "A1-100,B1-200"
+            },
+            "event_time": "2026-09-12T20:00:00+03:00",
+            "registration_deadline": "2026-09-11T20:00:00+03:00",
+            "status": "published",
+            "number_of_visitors": 0
+        }
+        """
         result = await self.session.execute(
             select(Event)
             .where(Event.uuid == event_id)
@@ -30,7 +53,36 @@ class PostgresEventRepository(EventRepository):
     async def get_all(
             self, paginator: Paginator
     ) -> tuple[list[Event], str | None, str | None]:
-        """Получение списка событий"""
+        """
+        Возвращает список всех событий с пагинацией и фильтрацией.
+        Данные берутся из локальной БД (синхронизируются с внешним API).
+
+        Пример запроса:
+        GET /api/event/
+
+        Пример ответа:
+        {
+            "data": [
+            {
+                "uuid": "123e4567-e89b-12d3-a456-426614174000",
+                "name": "Концерт",
+                "event_time": "2026-09-12T20:00:00+03:00",
+                "registration_deadline": "2026-09-11T20:00:00+03:00",
+                "status": "published",
+                "number_of_visitors": 0,
+                "place_id": "123e4567-e89b-12d3-a456-426614174000",
+                "created_at": "2026-09-01T10:00:00+03:00",
+                "changed_at": "2026-09-05T10:00:00+03:00",
+                "status_changed_at": null
+            }
+            ],
+                "meta": {
+                "limit": 100,
+                "next": "/api/events/?cursor=123e4567...",
+                "previous": null
+            }
+        }
+        """
         query = select(Event)
 
         filters = []
@@ -81,21 +133,150 @@ class PostgresEventRepository(EventRepository):
 
         return events, next_cursor, previous_cursor
 
-    async def save(self, event: Event) -> Event:
-        """Сохранить событие в БД"""
-        self.session.add(event)
-        await self.session.commit()
-        await self.session.refresh(event)
-        return event
+    async def get_place(self, place_id: str) -> Place | None:
+        """Получить площадку по UUID."""
+        result = await self.session.execute(
+            select(Place).where(Place.uuid == place_id)
+        )
+        return result.scalar_one_or_none()
 
-    async def delete(self, event_id: str) -> bool:
-        """Удалить событие из БД"""
-        event = await self.get(event_id)
-        if not event:
-            return False
-        await self.session.delete(event)
+    async def save_place(self, place: Place) -> Place:
+        """Сохранить площадку в БД."""
+        self.session.add(place)
         await self.session.commit()
-        return True
+        await self.session.refresh(place)
+        return place
+
+    async def get_available_seat(self, event_id) -> list[Seat]:
+        """
+        Возвращает список свободных мест на мероприятии.
+
+        Пример запроса:
+        GET /api/events/{event_id}/seats/
+
+        Пример ответа:
+        {
+            "event_id": "123e4567-e89b-12d3-a456-426614174000",
+            "available_seats":
+            [
+                {"section": "A", "seat_number": 1},
+                {"section": "A", "seat_number": 2}
+            ],
+            "count": 2
+        }
+        """
+        query = select(Seat).join(
+            Place, Place.uuid == Seat.place_id
+        ).join(
+            Event, Event.place_id == Place.uuid
+        ).where(
+            Event.uuid == event_id,
+            Seat.is_available == True
+        )
+
+        result = await self.session.execute(query)
+        return result.scalars().all()
+
+    async def register(
+            self,
+            event_id: str,
+            first_name: str,
+            last_name: str,
+            seat: str,
+            email: str
+    ) -> Registration:
+        """
+        Регистрация на событие.
+
+        Пример запроса:
+        POST /api/events/{event_id}/register/
+        {
+            "first_name": "Иван",
+            "last_name": "Иванов",
+            "seat": "A12",
+            "email": "ivan@example.com"
+        }
+
+        Пример ответа:
+        {
+            "ticket_id": "123e4567-e89b-12d3-a456-426614174000"
+        }
+        """
+        try:
+            seat_obj = await self.get_seat_by_number(event_id, seat, lock=True)
+
+            if not seat_obj:
+                raise SeatNotFoundError(f"Место {seat} не найдено")
+
+            if seat_obj.is_available == False:
+                raise SeatNotAvailableError(f"Место {seat} уже занято")
+
+            registration = Registration(
+                first_name=first_name,
+                last_name=last_name,
+                seat_id=seat_obj.id,
+                email=email,
+                event_id=event_id
+            )
+
+            self.session.add(registration)
+            seat_obj.is_available = False
+            await self.session.commit()
+            await self.session.refresh(registration)
+
+            return registration
+
+        except Exception:
+            await self.session.rollback()
+            raise
+
+    async def cancel_registration(self, ticket_id: str) -> bool:
+        """
+        Отмена регистрации на событие.
+
+        Пример запроса:
+        POST /api/events/{event_id}/unregister/
+        {
+            "ticket_id": "123e4567-e89b-12d3-a456-426614174000"
+        }
+        
+        Пример ответа:
+        {
+            "success": true
+        }
+        """
+        try:
+            result = await self.session.execute(
+                select(Registration).where(Registration.ticket_id == ticket_id)
+            )
+            registration = result.scalar_one_or_none()
+
+            if not registration:
+                return False
+
+            seat_result = await self.session.execute(
+                select(Seat).where(Seat.id == registration.seat_id)
+            )
+            seat = seat_result.scalar_one_or_none()
+
+            if seat:
+                seat.is_available = True
+
+            await self.session.delete(registration)
+            await self.session.commit()
+
+            return True
+
+        except Exception:
+            await self.session.rollback()
+            raise
+
+    async def get_registration_by_ticket(self, ticket_id: str) -> Registration | None:
+        """Найти регистрацию по ticket_id"""
+        result = await self.session.execute(
+            select(Registration).where(Registration.ticket_id == ticket_id)
+        )
+        return result.scalar_one_or_none()
 
     async def _parse_seat(self, seat_number: str) -> tuple[str, int] | None:
         """Парсит номер места из строки"""
@@ -131,88 +312,63 @@ class PostgresEventRepository(EventRepository):
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
-    async def register(
-            self,
-            event_id: str,
-            first_name: str,
-            last_name: str,
-            seat: str,
-            email: str
-    ) -> Registration:
-        """Регистрация на событие"""
-        try:
-            seat_obj = await self.get_seat_by_number(event_id, seat, lock=True)
+    async def save_or_update(self, event: Event) -> Event:
+        """
+        Сохранить или обновить событие с площадкой.
+        """
+        if event.place:
+            existing_place = await self.get_place(event.place.uuid)
 
-            if not seat_obj:
-                raise SeatNotFoundError(f"Место {seat} не найдено")
+            if existing_place:
+                existing_place.name = event.place.name
+                existing_place.city = event.place.city
+                existing_place.address = event.place.address
+                existing_place.seats_pattern = event.place.seats_pattern
+                await self.session.flush()
+                event.place_id = existing_place.uuid
 
-            if seat_obj.is_available == False:
-                raise SeatNotAvailableError(f"Место {seat} уже занято")
+            else:
+                self.session.add(event.place)
+                await self.session.flush()
+                event.place_id = event.place.uuid
 
-            registration = Registration(
-                first_name=first_name,
-                last_name=last_name,
-                seat_id=seat_obj.id,
-                email=email,
-                event_id=event_id
-            )
+            event.place = None
 
-            self.session.add(registration)
-            seat_obj.is_available = False
+        if not event.place_id:
+            raise ValueError(f"place_id не установлен для события {event.uuid}")
+
+        existing_event = await self.get(event.uuid)
+
+        if existing_event:
+            existing_event.name = event.name
+            existing_event.event_time = event.event_time
+            existing_event.registration_deadline = event.registration_deadline
+            existing_event.status = event.status
+            existing_event.number_of_visitors = event.number_of_visitors
+            existing_event.changed_at = event.changed_at
+            existing_event.created_at = event.created_at
+            existing_event.status_changed_at = event.status_changed_at
+            existing_event.place_id = event.place_id
+
             await self.session.commit()
-            await self.session.refresh(registration)
+            await self.session.refresh(existing_event)
 
-            return registration
-
-        except Exception:
-            await self.session.rollback()
-            raise
-
-    async def get_registration_by_ticket(self, ticket_id: str) -> Registration | None:
-        """Найти регистрацию по ticket_id"""
-        result = await self.session.execute(
-            select(Registration).where(Registration.ticket_id == ticket_id)
-        )
-        return result.scalar_one_or_none()
-
-    async def cancel_registration(self, ticket_id: str) -> bool:
-        """Отмена регистрации на событие"""
-        try:
-            result = await self.session.execute(
-                select(Registration).where(Registration.ticket_id == ticket_id)
+            return existing_event
+        else:
+            new_event = Event(
+                uuid=event.uuid,
+                place_id=event.place_id,
+                name=event.name,
+                event_time=event.event_time,
+                registration_deadline=event.registration_deadline,
+                status=event.status,
+                number_of_visitors=event.number_of_visitors,
+                changed_at=event.changed_at,
+                created_at=event.created_at,
+                status_changed_at=event.status_changed_at
             )
-            registration = result.scalar_one_or_none()
-
-            if not registration:
-                return False
-
-            seat_result = await self.session.execute(
-                select(Seat).where(Seat.id == registration.seat_id)
-            )
-            seat = seat_result.scalar_one_or_none()
-
-            if seat:
-                seat.is_available = True
-
-            await self.session.delete(registration)
+            self.session.add(new_event)
             await self.session.commit()
+            await self.session.refresh(new_event)
 
-            return True
-
-        except Exception:
-            await self.session.rollback()
-            raise
-
-    async def get_available_seat(self, event_id) -> list[Seat]:
-        """Получение свободных мест на событие"""
-        query = select(Seat).join(
-            Place, Place.uuid == Seat.place_id
-        ).join(
-            Event, Event.place_id == Place.uuid
-        ).where(
-            Event.uuid == event_id,
-            Seat.is_available == True
-        )
-
-        result = await self.session.execute(query)
-        return result.scalars().all()
+            return new_event
