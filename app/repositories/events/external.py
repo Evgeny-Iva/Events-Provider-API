@@ -1,9 +1,9 @@
+import uuid
 from app.models import Event, Place
 from app.repositories.events.interface import EventRepository
 from app.clients.events_provider_client import EventsProviderClient
 from app.schemas.events import Paginator
 from datetime import datetime
-import uuid
 
 
 def parse_date(value):
@@ -18,14 +18,17 @@ def parse_date(value):
 
 
 def ensure_uuid(value):
-    """Преобразует значение в UUID или строку UUID."""
+    """Преобразует значение в UUID объект."""
     if value is None:
         return None
     if isinstance(value, uuid.UUID):
-        return str(value)
-    if isinstance(value, str):
         return value
-    return str(value)
+    if isinstance(value, str):
+        try:
+            return uuid.UUID(value)
+        except ValueError:
+            return None
+    return None
 
 
 class ExternalEventRepository(EventRepository):
@@ -53,6 +56,11 @@ class ExternalEventRepository(EventRepository):
                 continue
 
             place_uuid = ensure_uuid(place_data.get("id"))
+            event_uuid = ensure_uuid(raw.get("id"))
+
+            if not place_uuid or not event_uuid:
+                print(f"Пропускаем событие: невалидный UUID")
+                continue
 
             place = Place(
                 uuid=place_uuid,
@@ -61,8 +69,6 @@ class ExternalEventRepository(EventRepository):
                 address=place_data.get("address"),
                 seats_pattern=place_data.get("seats_pattern"),
             )
-
-            event_uuid = ensure_uuid(raw.get("id"))
 
             event = Event(
                 uuid=event_uuid,
@@ -76,7 +82,7 @@ class ExternalEventRepository(EventRepository):
                 created_at=parse_date(raw.get("created_at")),
                 status_changed_at=parse_date(raw.get("status_changed_at")),
                 place=place,
-                place_id=place.uuid,
+                place_id=place_uuid,
             )
             events.append(event)
 

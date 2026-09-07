@@ -1,6 +1,7 @@
 import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+
 from app.database import create_tables, get_session
 from app.repositories.events.postgres import PostgresEventRepository
 from app.routers import events

@@ -1,4 +1,5 @@
 import re
+import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
@@ -99,7 +100,12 @@ class PostgresEventRepository(EventRepository):
             filters.append(Event.event_time <= paginator.to_date)
 
         if paginator.cursor:
-            filters.append(Event.uuid > paginator.cursor)
+            try:
+                cursor_uuid = uuid.UUID(paginator.cursor)
+                filters.append(
+                    Event.uuid > cursor_uuid)
+            except ValueError:
+                pass
 
         if filters:
             query = query.where(and_(*filters))
@@ -118,18 +124,23 @@ class PostgresEventRepository(EventRepository):
             events = events[:-1]
 
         if paginator.cursor:
-            prev_query = select(Event).where(
-                and_(*filters, Event.uuid < paginator.cursor)
-            )
-            prev_query = prev_query.order_by(Event.uuid.desc()).limit(
-                paginator.limit
-            )
+            try:
+                cursor_uuid = uuid.UUID(paginator.cursor)
+                prev_filters = filters.copy() if filters else []
+                prev_filters.append(Event.uuid < cursor_uuid)
 
-            prev_result = await self.session.execute(prev_query)
-            prev_events = prev_result.scalars().all()
+                prev_query = select(Event).where(and_(*prev_filters))
+                prev_query = prev_query.order_by(Event.uuid.desc()).limit(
+                    paginator.limit
+                )
 
-            if prev_events:
-                previous_cursor = str(prev_events[-1].uuid)
+                prev_result = await self.session.execute(prev_query)
+                prev_events = prev_result.scalars().all()
+
+                if prev_events:
+                    previous_cursor = str(prev_events[-1].uuid)
+            except ValueError:
+                pass
 
         return events, next_cursor, previous_cursor
 
@@ -317,7 +328,11 @@ class PostgresEventRepository(EventRepository):
         Сохранить или обновить событие с площадкой.
         """
         if event.place:
-            existing_place = await self.get_place(event.place.uuid)
+            place_uuid = event.place.uuid
+            if isinstance(place_uuid, str):
+                place_uuid = uuid.UUID(place_uuid)
+
+            existing_place = await self.get_place(place_uuid)
 
             if existing_place:
                 existing_place.name = event.place.name
@@ -326,18 +341,28 @@ class PostgresEventRepository(EventRepository):
                 existing_place.seats_pattern = event.place.seats_pattern
                 await self.session.flush()
                 event.place_id = existing_place.uuid
-
             else:
-                self.session.add(event.place)
+                place = Place(
+                    uuid=place_uuid,
+                    name=event.place.name,
+                    city=event.place.city,
+                    address=event.place.address,
+                    seats_pattern=event.place.seats_pattern,
+                )
+                self.session.add(place)
                 await self.session.flush()
-                event.place_id = event.place.uuid
+                event.place_id = place.uuid
 
             event.place = None
 
         if not event.place_id:
             raise ValueError(f"place_id не установлен для события {event.uuid}")
 
-        existing_event = await self.get(event.uuid)
+        event_uuid = event.uuid
+        if isinstance(event_uuid, str):
+            event_uuid = uuid.UUID(event_uuid)
+
+        existing_event = await self.get(event_uuid)
 
         if existing_event:
             existing_event.name = event.name
@@ -352,11 +377,11 @@ class PostgresEventRepository(EventRepository):
 
             await self.session.commit()
             await self.session.refresh(existing_event)
-
             return existing_event
         else:
+
             new_event = Event(
-                uuid=event.uuid,
+                uuid=event_uuid,
                 place_id=event.place_id,
                 name=event.name,
                 event_time=event.event_time,
@@ -370,5 +395,4 @@ class PostgresEventRepository(EventRepository):
             self.session.add(new_event)
             await self.session.commit()
             await self.session.refresh(new_event)
-
             return new_event

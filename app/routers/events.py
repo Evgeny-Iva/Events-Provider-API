@@ -44,7 +44,6 @@ def get_events_usecase(
 async def get_events(
         paginator: Paginator = Depends(),
         usecase: GetAllEventsUsecase = Depends(get_events_usecase),
-        api_key: str = Depends(verify_api_key)
 ):
     """Получить список событий."""
     try:
