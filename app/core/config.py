@@ -22,6 +22,13 @@ class Settings(BaseSettings):
     POSTGRES_DATABASE_NAME: str = os.getenv("POSTGRES_DATABASE_NAME", "")
     POSTGRES_PASSWORD_K8S: str = os.getenv("POSTGRES_PASSWORD", "")
 
+    @staticmethod
+    def _get_postgres_host() -> str:
+        """Определяет хост PostgreSQL в зависимости от окружения"""
+        if os.getenv("KUBERNETES_SERVICE_HOST"):
+            return "postgres-postgresql.postgres.svc"
+        return os.getenv("POSTGRES_HOST", "localhost")
+
     @property
     def DATABASE_URL(self) -> str:
         """Асинхронный URL для приложения"""
