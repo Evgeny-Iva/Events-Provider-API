@@ -10,9 +10,7 @@ from app.core.exceptions import (
     EventNotPublishedError
 )
 from app.dependencies.auth import verify_api_key
-from app.services.sync_service import SyncService
 from app.usecases import *
-from app.database import get_session
 from app.repositories.events.postgres import PostgresEventRepository
 from app.schemas.registration import RegistrationRequest, RegistrationResponse
 from app.schemas.events import (
@@ -89,24 +87,6 @@ async def get_events(
             status_code=500,
             detail={"detail": "Internal server error"}
         )
-
-
-@router.get("/health")
-async def health_check():
-    return {"status": "ok"}
-
-
-@router.post("/sync/trigger")
-async def trigger_sync():
-    """Ручной запуск синхронизации."""
-    try:
-        async with get_session() as session:
-            repo = PostgresEventRepository(session)
-            sync_service = SyncService()
-            await sync_service.sync_events(repo)
-        return {"status": "sync completed"}
-    except Exception as e:
-        raise HTTPException(500, f"Sync failed: {e}")
 
 
 def get_register_usecase(

@@ -4,7 +4,7 @@ from fastapi import FastAPI
 
 from app.database import create_tables, get_session
 from app.repositories.events.postgres import PostgresEventRepository
-from app.routers import events
+from app.routers import events, admin
 from app.services.sync_service import SyncService
 
 
@@ -34,4 +34,5 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 app.include_router(events.router)
+app.include_router(admin.router)
 
