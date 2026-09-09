@@ -10,8 +10,6 @@ services:
       - .env
     environment:
       PYTHONPATH: /app
-      POSTGRES_HOST: db
-      DB_HOST: db
     volumes:
       - ./logs:/app/logs
       - ./migrations:/app/migrations
