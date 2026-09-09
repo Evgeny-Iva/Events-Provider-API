@@ -84,7 +84,7 @@ class PostgresEventRepository(EventRepository):
             }
         }
         """
-        query = select(Event)
+        query = select(Event).options(joinedload(Event.place))
 
         filters = []
         if paginator.changed_at:

@@ -14,10 +14,11 @@ from app.usecases import *
 from app.repositories.events.postgres import PostgresEventRepository
 from app.schemas.registration import RegistrationRequest, RegistrationResponse
 from app.schemas.events import (
-    EventListResponse,
     Paginator,
     PlaceInfo,
-    EventDetailResponse
+    EventDetailResponse,
+    PlaceInfoFull,
+    EventListResponse, EventListItem,
 )
 from app.database import get_db
 
@@ -61,14 +62,35 @@ async def get_events(
             params["cursor"] = previous_cursor
             previous_url = f"{base_url}?{urlencode(params)}"
 
-        return {
-            "data": events,
-            "meta": {
-                "limit": paginator.limit,
-                "next": next_url,
-                "previous": previous_url
-            }
-        }
+        results = []
+        for event in events:
+            results.append(EventListItem(
+                id=event.uuid,
+                name=event.name,
+                place=PlaceInfoFull(
+                    id=event.place.uuid,
+                    name=event.place.name,
+                    city=event.place.city,
+                    address=event.place.address,
+                    seats_pattern=event.place.seats_pattern,
+                    changed_at=event.place.changed_at,
+                    created_at=event.place.created_at,
+                ),
+                event_time=event.event_time,
+                registration_deadline=event.registration_deadline,
+                status=event.status,
+                number_of_visitors=event.number_of_visitors,
+                changed_at=event.changed_at,
+                created_at=event.created_at,
+                status_changed_at=event.status_changed_at,
+            ))
+
+
+        return EventListResponse(
+            next=next_url,
+            previous=previous_url,
+            results=results
+        )
 
 
     except ValueError as e:

@@ -32,27 +32,36 @@ class Paginator(BaseModel):
         return v
 
 
-class EventResponse(BaseModel):
-    """Схема для ответа с одним событием"""
-    uuid: uuid.UUID
+class PlaceInfoFull(BaseModel):
+    """Полная информация о площадке"""
+    id: uuid.UUID
     name: str
+    city: str
+    address: str
+    seats_pattern: str
+    changed_at: datetime | None = None
+    created_at: datetime | None = None
+
+
+class EventListItem(BaseModel):
+    """Событие в списке"""
+    id: uuid.UUID
+    name: str
+    place: PlaceInfoFull
     event_time: datetime
     registration_deadline: datetime
     status: str
     number_of_visitors: int
-    place_id: uuid.UUID
-    created_at: datetime
     changed_at: datetime
+    created_at: datetime
     status_changed_at: datetime | None
-
-    class Config:
-        from_attributes = True
 
 
 class EventListResponse(BaseModel):
-    """Схема для ответа со списком событий"""
-    data: list[EventResponse]
-    meta: dict
+    """Ответ со списком событий"""
+    next: str | None = None
+    previous: str | None = None
+    results: list[EventListItem]
 
 
 class PlaceInfo(BaseModel):
